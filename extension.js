@@ -49,10 +49,10 @@ function parseUnityMessage(message) {
 	return parsedMessage;
 }
 
-async function getDebugPortFromLocalProcessesMacOs(game, rinfo) {
+async function getDebugPortFromLocalProcessesMacOs(game, rinfo, isEditor = false) {
 	const child_process = require('child_process');
 
-	let returnPort = 0;
+	let returnPort = -1;
 
 	try {
 		const output = await new Promise((resolve, reject) => {
@@ -73,28 +73,88 @@ async function getDebugPortFromLocalProcessesMacOs(game, rinfo) {
 		});
 
 		let lines = output.split('\n');
-		lines.forEach(line => {
-			const match = line.match(/TCP \*:(\d+)/);
-			if (match) {
-				const port = parseInt(match[1], 10);
-				if (port !== rinfo.port && port !== game.Port) {
-					// This is the port you're interested in
-					returnPort = port;
+		let foundReturnPort = false;
+		if (isEditor) {
+			// use the debugIp to find the first port that is not the game port or the rinfo port
+			lines.forEach(line => {
+				const match = line.match(/TCP (\d+\.\d+\.\d+\.\d+):(\d+)/);
+				if (match) {
+					const port = parseInt(match[2], 10);
+					if (port !== rinfo.port && port !== parseInt(game.Port)) {
+						// This is the port you're interested in
+						if (returnPort === -1) {
+							returnPort = port;
+						}
+					}
 				}
-			}
-		});
+			});
+		} else {
+			lines.forEach(line => {
+				const match = line.match(/TCP \*:(\d+)/);
+				if (match) {
+					const port = parseInt(match[1], 10);
+					if (port !== rinfo.port && port !== parseInt(game.Port)) {
+						// This is the port you're interested in
+						if (returnPort === -1) {
+							returnPort = port;
+						}
+					}
+				}
+			});
+		}
 
 		return returnPort;
 	} catch (error) {
 		vscode.window.showErrorMessage(`Error: ${error.message}`);
-		return 0;
+		return -1;
 	}
+}
+
+async function getDebugPortFromRemoteProcessesMacOs(game, rinfo) {
+	let returnPort = -1;
+
+	// Use netstat to list all listening ports
+	const { exec } = require('child_process');
+	const netstat = await new Promise((resolve, reject) => {
+		exec('netstat -an | grep LISTEN', (error, stdout, stderr) => {
+			if (error) {
+				reject(error);
+				return;
+			}
+
+			if (stderr) {
+				reject(new Error(stderr));
+				return;
+			}
+
+			resolve(stdout);
+		});
+	});
+
+	// Parse the netstat output to find the open ports
+	const openPorts = netstat.match(new RegExp(game.IP + '\\.(\d+) \*\\.LISTEN', 'g'));
+	if (openPorts) {
+		// Filter out the game port and rinfo port
+		const filteredPorts = openPorts.filter(port => {
+			const portNumber = parseInt(port.split('.')[1], 10);
+			return portNumber !== parseInt(game.Port) && portNumber !== rinfo.port;
+		});
+
+		// Assuming the game is using the first open port
+		if (filteredPorts.length > 0) {
+			if (returnPort === -1) {
+				returnPort = parseInt(filteredPorts[0].split('.')[1], 10);
+			}
+		}
+	}
+
+	return returnPort;
 }
 
 async function getDebugPortFromLocalProcessesWindows(game, rinfo) {
 	const child_process = require('child_process');
 
-	let returnPort = 0;
+	let returnPort = -1;
 
 	try {
 		const output = await new Promise((resolve, reject) => {
@@ -135,23 +195,66 @@ async function getDebugPortFromLocalProcessesWindows(game, rinfo) {
 				});
 			});
 
-			if (processNameOutput.includes(game.ProjectName) && port !== rinfo.port && port !== game.Port) {
+			if (processNameOutput.includes(game.ProjectName) && port !== rinfo.port && port !== parseInt(game.Port)) {
 				// This is the port you're interested in
-				returnPort = port;
+				if (returnPort === -1) {
+					returnPort = port;
+				}
 			}
 		});
 
 		return returnPort;
 	} catch (error) {
 		vscode.window.showErrorMessage(`Error: ${error.message}`);
-		return 0;
+		return -1;
 	}
+}
+
+async function getDebugPortFromRemoteProcessesWindows(game, rinfo) {
+	let returnPort = -1;
+
+	// Use netstat to list all listening ports
+	const { exec } = require('child_process');
+	const netstat = await new Promise((resolve, reject) => {
+		exec('netstat -ano | findstr LISTENING', (error, stdout, stderr) => {
+			if (error) {
+				reject(error);
+				return;
+			}
+
+			if (stderr) {
+				reject(new Error(stderr));
+				return;
+			}
+
+			resolve(stdout);
+		});
+	});
+
+	// Parse the netstat output to find the open ports
+	const openPorts = netstat.match(new RegExp('TCP    ' + game.IP + ':([0-9]*)', 'g'));
+	if (openPorts) {
+		// Filter out the game port and rinfo port
+		const filteredPorts = openPorts.filter(port => {
+			const portNumber = parseInt(port.split(':')[1], 10);
+			return portNumber !== parseInt(game.Port) && portNumber !== rinfo.port;
+		});
+
+		// Assuming the game is using the first open port
+		if (filteredPorts.length > 0) {
+			if (returnPort === -1) {
+				returnPort = parseInt(filteredPorts[0].split(':')[1], 10);
+			}
+		}
+	}
+
+	return returnPort;
 }
 
 async function getDebugPortFromLocalProcessesLinux(game, rinfo) {
 	const child_process = require('child_process');
 
-	let returnPort = 0;
+	let returnPort = -1;
 
 	try {
 		const output = await new Promise((resolve, reject) => {
@@ -192,19 +295,61 @@ async function getDebugPortFromLocalProcessesLinux(game, rinfo) {
 				});
 			});
 
-			if (processNameOutput.includes(game.ProjectName) && port !== rinfo.port && port !== game.Port) {
+			if (processNameOutput.includes(game.ProjectName) && port !== rinfo.port && port !== parseInt(game.Port)) {
 				// This is the port you're interested in
-				returnPort = port;
+				if (returnPort === -1) {
+					returnPort = port;
+				}
 			}
 		});
 
 		return returnPort;
 	} catch (error) {
 		vscode.window.showErrorMessage(`Error: ${error.message}`);
-		return 0;
+		return -1;
 	}
 }
 
+async function getDebugPortFromRemoteProcessesLinux(game, rinfo) {
+	let returnPort = -1;
+
+	// Use netstat to list all listening ports
+	const { exec } = require('child_process');
+	const netstat = await new Promise((resolve, reject) => {
+		exec('netstat -tuln | grep LISTEN', (error, stdout, stderr) => {
+			if (error) {
+				reject(error);
+				return;
+			}
+
+			if (stderr) {
+				reject(new Error(stderr));
+				return;
+			}
+
+			resolve(stdout);
+		});
+	});
+
+	// Parse the netstat output to find the open ports
+	const openPorts = netstat.match(new RegExp(game.IP + ':([0-9]*)', 'g'));
+	if (openPorts) {
+		// Filter out the game port and rinfo port
+		const filteredPorts = openPorts.filter(port => {
+			const portNumber = parseInt(port.split(':')[1], 10);
+			return portNumber !== parseInt(game.Port) && portNumber !== rinfo.port;
+		});
+
+		// Assuming the game is using the first open port
+		if (filteredPorts.length > 0) {
+			if (returnPort === -1) {
+				returnPort = parseInt(filteredPorts[0].split(':')[1], 10);
+			}
+		}
+	}
+
+	return returnPort;
+}
 
 function isUnityRunning() {
 	const child_process = require('child_process');
@@ -217,29 +362,65 @@ function isUnityRunning() {
 				reject(err);
 			} else {
 				// Check if the output includes 'Unity'
-				resolve(stdout.includes('Unity') && !stdout.includes('Unity Hub'));
+				let appExt = process.platform === 'win32' ? '.exe' : process.platform === 'darwin' ? '.app' : '';
+				let containsUnity = stdout.match(new RegExp(`Unity${appExt}`, 'g'));
+				resolve(containsUnity !== null);
 			}
 		});
 	});
 }
 
-async function processGame(games, game, rinfo) {
+async function processGame(games, game, rinfo, isEditor = false) {
 	const os = require('os');
 
 	let ipAndPort = extractIpAndPort(game.Id);
-	//NOTE: I assume that the game is running on the same machine as the editor
+	//NOTE: This is a workaround for the case where the IP and port are not included in the game.Id
 	if (ipAndPort.success === false) {
-
 		let debugPort;
-		if (os.platform() === 'darwin') {
-			debugPort = await getDebugPortFromLocalProcessesMacOs(game, rinfo);
-		} else if (os.platform() === 'win32') {
-			debugPort = await getDebugPortFromLocalProcessesWindows(game, rinfo);
-		} else if (os.platform() === 'linux') {
-			debugPort = await getDebugPortFromLocalProcessesLinux(game, rinfo);
+		let isLocalHost = false;
+		if (isEditor) {
+			isLocalHost = true;
 		} else {
-			vscode.window.showErrorMessage(`Unsupported platform: ${os.platform()}`);
-			return;
+			const networkInterfaces = os.networkInterfaces();
+			for (const name of Object.keys(networkInterfaces)) {
+				for (const net of networkInterfaces[name]) {
+					if (net.family === 'IPv4' && !net.internal) {
+						if (net.address === game.IP) {
+							isLocalHost = true;
+							break;
+						}
+					}
+				}
+				if (isLocalHost) {
+					break;
+				}
+			}
+		}
+
+		let currentPlatform = os.platform();
+		if (isLocalHost) {
+			if (currentPlatform === 'darwin') {
+				debugPort = await getDebugPortFromLocalProcessesMacOs(game, rinfo, isEditor);
+			} else if (currentPlatform === 'win32') {
+				debugPort = await getDebugPortFromLocalProcessesWindows(game, rinfo);
+			} else if (currentPlatform === 'linux') {
+				debugPort = await getDebugPortFromLocalProcessesLinux(game, rinfo);
+			} else {
+				vscode.window.showErrorMessage(`Unsupported platform: ${currentPlatform}`);
+				return;
+			}
+		}
+		else {
+			if (currentPlatform === 'darwin') {
+				debugPort = await getDebugPortFromRemoteProcessesMacOs(game, rinfo);
+			} else if (currentPlatform === 'win32') {
+				debugPort = await getDebugPortFromRemoteProcessesWindows(game, rinfo);
+			} else if (currentPlatform === 'linux') {
+				debugPort = await getDebugPortFromRemoteProcessesLinux(game, rinfo);
+			} else {
+				vscode.window.showErrorMessage(`Unsupported platform: ${currentPlatform}`);
+				return;
+			}
 		}
 
 		ipAndPort.port = debugPort;
@@ -289,29 +470,34 @@ function activate(context) {
 					quickPick.items = games.map(g => {
 						return {
 							label: g.Id,
-							description: `${g.ProjectName} (${g.PackageName})`
+							description: `${g.ProjectName} ${g.debugIp}:${g.debugPort} (${g.PackageName})`
 						}
 					});
 				});
 			});
 
-			if (isUnityRunning()) {
-				let game = {
-					Id: 'Unity',
-					IP: 'localhost',
-					ProjectName: 'Unity Editor',
-					PackageName: '-',
-					isEditor: true
-				};
+			let unityRunning = isUnityRunning();
+			unityRunning.then((value) => {
+				if (value === true) {
+					let game = {
+						Id: 'Unity Editor',
+						IP: '127.0.0.1',
+						ProjectName: 'Unity',
+						PackageName: '-',
+						debugIp: '127.0.0.1',
+						isEditor: true
+					};
 
-				games.push(game);
-				quickPick.items = games.map(g => {
-					return {
-						label: g.Id,
-						description: `${g.ProjectName} (${g.PackageName})`
-					}
-				});
-			}
+					processGame(games, game, { port: 56000 }, true).then(() => {
+						quickPick.items = games.map(g => {
+							return {
+								label: g.Id,
+								description: `${g.ProjectName} ${g.debugIp}:${g.debugPort} (${g.PackageName})`
+							}
+						});
+					});
+				}
+			});
 
 			// Handle error events
 			socket.on('error', (err) => {
@@ -326,7 +512,7 @@ function activate(context) {
 						name: `Attach to ${selectedGameInfo.Id}`,
 						type: 'vstuc',
 						request: 'attach',
-						endPoint: 'localhost:56000'
+						endPoint: `${selectedGameInfo.debugIp}:${selectedGameInfo.debugPort}`
 					})
 				} else {
 					vscode.debug.startDebugging(undefined, {
