@@ -1,0 +1,47 @@
+{
+  "name": "find-remote-debug",
+  "displayName": "Remote Unity Debugger Attacher",
+  "description": "This extension is listening to any Unity players in your LAN and attempts to attach unity debugger",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./extension.js",
+  "contributes": {
+    "keybindings": [
+      {
+        "command": "FindRemoteDebug.findAndAttach",
+        "key": "Shift+F5",
+        "mac": "Shift+F5",
+        "when": "editorTextFocus"
+      }
+    ],
+    "commands": [
+      {
+        "command": "FindRemoteDebug.findAndAttach",
+        "title": "Find and Attach Unity Debugger"
+      }
+    ]
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "pretest": "npm run lint",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "18.x",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-cli": "^0.0.4",
+    "@vscode/test-electron": "^2.3.8",
+    "eslint": "^8.54.0",
+    "typescript": "^5.3.2"
+  },
+  "dependencies": {
+    "dgram": "^1.0.1"
+  }
+}
