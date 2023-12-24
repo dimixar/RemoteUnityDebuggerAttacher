@@ -14,7 +14,7 @@ It listens to a socket that Unity Editor uses for finding Unity Players for remo
 
 ## Getting Started
 
-1. Install the extension in VSCode using the vsix package inside the folder `builds`. (Optionally I plan to publish this extension on VSCode marketplace, once I'm sure that it works on other platforms as well.)
+1. Install the extension in VSCode using the vsix package from `releases` section. (Optionally I plan to publish this extension on VSCode marketplace, once I'm sure that it works on other platforms as well.)
 2. Open your unity c# project in VSCode.
 3. Press `SHIFT+F5` and choose the device/player to attach unity debugger.
 
