@@ -155,6 +155,7 @@ async function getDebugPortFromLocalProcessesWindows(game, rinfo) {
 	const child_process = require('child_process');
 
 	let returnPort = -1;
+	let sanitizedProjectName = game.ProjectName.replace(/\x00/g, '');
 
 	try {
 		const output = await new Promise((resolve, reject) => {
@@ -174,10 +175,15 @@ async function getDebugPortFromLocalProcessesWindows(game, rinfo) {
 		});
 
 		let lines = output.split('\n');
-		lines.forEach(async line => {
+		let promises = lines.map(async line => {
 			const parts = line.split(/\s+/);
-			const port = parseInt(parts[1].split(':')[1], 10);
-			const pid = parts[4];
+			const match = parts[2] && parts[2].match(/:(\d+)/);
+			const port = match ? parseInt(match[1]) : null;
+			const pid = parts[5] ? parts[5] : null;
+
+			if (port === null || pid === null) {
+				return;
+			}
 
 			const processNameOutput = await new Promise((resolve, reject) => {
 				child_process.exec(`tasklist /FI "PID eq ${pid}"`, (error, stdout, stderr) => {
@@ -195,13 +201,15 @@ async function getDebugPortFromLocalProcessesWindows(game, rinfo) {
 				});
 			});
 
-			if (processNameOutput.includes(game.ProjectName) && port !== rinfo.port && port !== parseInt(game.Port)) {
+			if (processNameOutput.includes(sanitizedProjectName) && port !== rinfo.port && port !== parseInt(game.Port)) {
 				// This is the port you're interested in
 				if (returnPort === -1) {
 					returnPort = port;
 				}
 			}
 		});
+
+		await Promise.all(promises);
 
 		return returnPort;
 	} catch (error) {
@@ -255,6 +263,7 @@ async function getDebugPortFromLocalProcessesLinux(game, rinfo) {
 	const child_process = require('child_process');
 
 	let returnPort = -1;
+	let sanitizedProjectName = game.ProjectName.replace(/\x00/g, '');
 
 	try {
 		const output = await new Promise((resolve, reject) => {
@@ -274,7 +283,7 @@ async function getDebugPortFromLocalProcessesLinux(game, rinfo) {
 		});
 
 		let lines = output.split('\n');
-		lines.forEach(async line => {
+		let promises = lines.map(async line => {
 			const parts = line.split(/\s+/);
 			const port = parseInt(parts[3].split(':')[1], 10);
 			const pid = parts[6].split('/')[0];
@@ -295,13 +304,15 @@ async function getDebugPortFromLocalProcessesLinux(game, rinfo) {
 				});
 			});
 
-			if (processNameOutput.includes(game.ProjectName) && port !== rinfo.port && port !== parseInt(game.Port)) {
+			if (processNameOutput.includes(sanitizedProjectName) && port !== rinfo.port && port !== parseInt(game.Port)) {
 				// This is the port you're interested in
 				if (returnPort === -1) {
 					returnPort = port;
 				}
 			}
 		});
+
+		await Promise.all(promises);
 
 		return returnPort;
 	} catch (error) {
