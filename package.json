@@ -2,7 +2,7 @@
   "name": "find-remote-debug",
   "displayName": "Remote Unity Debugger Attacher",
   "description": "This extension is listening to any Unity players in your LAN and attempts to attach unity debugger",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "engines": {
     "vscode": "^1.85.0"
   },

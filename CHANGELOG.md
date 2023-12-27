@@ -18,3 +18,7 @@ Major hotfix for macOS and hopefully for other platforms.
 
 - Introduce an alternate way of identifying IP address and port for a game build broadcasting hostname instead of IP and port inside the Id parameter of the broadcasting message
 - Fix not being able to attach to Unity Editor when a game build is running at the same time. 
+
+## [1.0.2]
+
+Hotfix for Windows OS not being able to extract the debug port in local processes.
