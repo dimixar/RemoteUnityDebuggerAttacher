@@ -1,5 +1,5 @@
 # WARNING
-I've managed to test the functionality only on macOS for now. The code for Windows and Linux is also present there, but haven't been able to test it properly yet. I would be very glad if you would create issues to those platforms and send pull requests with proposed fixes. This would help me immensely. 
+I've managed to test the functionality only on macOS and Windows for now. The code for Linux is also present there, but haven't been able to test it properly yet. I would be very glad if you would create issues to those platforms and send pull requests with proposed fixes. This would help me immensely. 
 
 # Find and Attach Unity Debugger to a Remotely Running Game.
 
