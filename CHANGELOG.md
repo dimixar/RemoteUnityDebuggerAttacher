@@ -4,8 +4,6 @@ All notable changes to the "findAndRemoteDebug" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## [Unreleased]
-
 ## [1.0.0]
 
 - Initial release
@@ -22,3 +20,7 @@ Major hotfix for macOS and hopefully for other platforms.
 ## [1.0.2]
 
 Hotfix for Windows OS not being able to extract the debug port in local processes.
+
+## [1.0.3]
+
+Fix not being able to attach debugger onto Unity Editor when launching from Windows OS.
