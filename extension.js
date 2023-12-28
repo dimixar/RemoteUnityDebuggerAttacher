@@ -151,7 +151,7 @@ async function getDebugPortFromRemoteProcessesMacOs(game, rinfo) {
 	return returnPort;
 }
 
-async function getDebugPortFromLocalProcessesWindows(game, rinfo) {
+async function getDebugPortFromLocalProcessesWindows(game, rinfo, isEditor = false) {
 	const child_process = require('child_process');
 
 	let returnPort = -1;
@@ -175,9 +175,11 @@ async function getDebugPortFromLocalProcessesWindows(game, rinfo) {
 		});
 
 		let lines = output.split('\n');
+		let maxMemoryUsage = 0;
 		let promises = lines.map(async line => {
 			const parts = line.split(/\s+/);
-			const match = parts[2] && parts[2].match(/:(\d+)/);
+			const match = parts[2] && parts[2].match(/\d+\.\d+\.\d+\.\d+:(\d+)/);
+			const ip = match ? match[0].split(':')[0] : null;
 			const port = match ? parseInt(match[1]) : null;
 			const pid = parts[5] ? parts[5] : null;
 
@@ -186,7 +188,7 @@ async function getDebugPortFromLocalProcessesWindows(game, rinfo) {
 			}
 
 			const processNameOutput = await new Promise((resolve, reject) => {
-				child_process.exec(`tasklist /FI "PID eq ${pid}"`, (error, stdout, stderr) => {
+				child_process.exec(`tasklist /FI "PID eq ${pid}" /FO LIST`, (error, stdout, stderr) => {
 					if (error) {
 						reject(error);
 						return;
@@ -201,10 +203,23 @@ async function getDebugPortFromLocalProcessesWindows(game, rinfo) {
 				});
 			});
 
-			if (processNameOutput.includes(sanitizedProjectName) && port !== rinfo.port && port !== parseInt(game.Port)) {
-				// This is the port you're interested in
-				if (returnPort === -1) {
-					returnPort = port;
+			if (processNameOutput.includes(sanitizedProjectName)) {
+				let memoryUsageLine = processNameOutput.split('\n').find(line => line.startsWith("Mem Usage:"));
+				if (memoryUsageLine) {
+					let memoryUsageString = memoryUsageLine.split(':')[1].trim().replace(/,/g, '');
+					let memoryUsage = parseInt(memoryUsageString);
+					if (isEditor) {
+						if (game.IP === ip && memoryUsage > maxMemoryUsage && port !== rinfo.port && port !== parseInt(game.Port) && port > 55000) {
+							maxMemoryUsage = memoryUsage;
+							returnPort = port;
+						}
+					}
+					else {
+						if (memoryUsage > maxMemoryUsage && port !== rinfo.port && port !== parseInt(game.Port)) {
+							maxMemoryUsage = memoryUsage;
+							returnPort = port;
+						}
+					}
 				}
 			}
 		});
@@ -413,7 +428,7 @@ async function processGame(games, game, rinfo, isEditor = false) {
 			if (currentPlatform === 'darwin') {
 				debugPort = await getDebugPortFromLocalProcessesMacOs(game, rinfo, isEditor);
 			} else if (currentPlatform === 'win32') {
-				debugPort = await getDebugPortFromLocalProcessesWindows(game, rinfo);
+				debugPort = await getDebugPortFromLocalProcessesWindows(game, rinfo, isEditor);
 			} else if (currentPlatform === 'linux') {
 				debugPort = await getDebugPortFromLocalProcessesLinux(game, rinfo);
 			} else {
